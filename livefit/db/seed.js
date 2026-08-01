@@ -3,21 +3,21 @@
  * 規則：可重複執行（先清空、再種入資料），即使執行多次也不會有資料疊加的狀況。
  * 執行順序：一定要先 npm run migration:run（沒有資料表，就無法種資料）
  */
-const { dataSource } = require('./data-source')
+const { dataSource } = require('./data-source');
 
 /** 清空：被 FK 指著的表最後刪（先刪 COURSE，再 USER / SKILL）。
  *  不用 clear()（TRUNCATE 會被 FK 擋）、不用 delete({})（TypeORM 拒絕空條件）。 */
 async function clearAll() {
   for (const name of ['Course', 'User', 'Skill']) {
     if (dataSource.hasMetadata(name)) {
-      await dataSource.createQueryBuilder().delete().from(name).execute()
+      await dataSource.createQueryBuilder().delete().from(name).execute();
     }
   }
 }
 
 async function main() {
-  await dataSource.initialize()
-  await clearAll()
+  await dataSource.initialize();
+  await clearAll();
 
   // ======================================================================
   // TODO：依照任務內容的規格寫入資料
@@ -30,9 +30,65 @@ async function main() {
   //     （TypeORM 會自動取出它的 id 填進外鍵），寫法範例：
   //      courseRepo.save({ name: '...', user: 教練物件, skill: 技能物件 })
   // ======================================================================
+  const skillRepo = dataSource.getRepository('Skill');
+  const userRepo = dataSource.getRepository('User');
+  const courseRepo = dataSource.getRepository('Course');
 
-  console.log('🌱 seed 完成')
-  await dataSource.destroy()
+  const skill = await skillRepo.save([
+    { name: '重訓' },
+    { name: '瑜珈' },
+    { name: '飛輪' },
+  ]);
+
+  const user = await userRepo.save([
+    { name: '海格教練', email: 'coach1@livefit.tw', role: 'COACH' },
+    { name: '小美教練', email: 'coach2@livefit.tw', role: 'COACH' },
+  ]);
+
+  const course = await courseRepo.save([
+    {
+      name: '肌力入門班',
+      description: '肌力入門班',
+      max_participants: 10,
+      start_at: new Date(),
+      end_at: new Date(),
+      user: user[0],
+      skill: skill[0],
+    },
+    {
+      name: '週末飛輪',
+      description: '週末飛輪',
+      max_participants: 10,
+      start_at: new Date(),
+      end_at: new Date(),
+      user: user[1],
+      skill: skill[2],
+    },
+    {
+      name: '晨間瑜珈',
+      description: '晨間瑜珈',
+      max_participants: 10,
+      start_at: new Date(),
+      end_at: new Date(),
+      user: user[0],
+      skill: skill[1],
+    },
+    {
+      name: '核心特訓',
+      description: '核心特訓',
+      max_participants: 10,
+      start_at: new Date(),
+      end_at: new Date(),
+      user: user[1],
+      skill: skill[0],
+    },
+  ]);
+
+  console.log('🌱 seed 完成');
+  await dataSource.destroy();
 }
 
-main().catch((e) => { console.error('seed 失敗：', e.message); process.exit(1) })
+main().catch((e) => {
+  console.error('seed 失敗：', e.message);
+  process.exit(1);
+});
